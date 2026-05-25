@@ -1,4 +1,4 @@
-# ⚡ Revenue Clock
+# Revenue Clock
 
 > **How much money is this outage costing us, right now?**
 
@@ -137,6 +137,3 @@ npm run dev   # opens http://localhost:5173
 | Backend | Python 3.11 + FastAPI + SSE |
 | Agent | Google Gemma 4 (`gemma-4-31b-it`) via Gemini API |
 | Frontend | React 18 + Vite |
-
-**Total application code: ~300 lines.** Coral does the hard part.
-# Revenue-Clock

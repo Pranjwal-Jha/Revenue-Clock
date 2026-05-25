@@ -30,8 +30,10 @@ export default function App() {
   const [streamError, setStreamError]  = useState(null)
   const [, setTick]                   = useState(0) // forces re-render for timeAgo
 
-  const rafRef  = useRef(null)
-  const burnRef = useRef(0) // burn per second across all active incidents
+  const rafRef      = useRef(null)
+  const baseRef     = useRef(0)                  // server's last revenue_lost total
+  const baseTimeRef = useRef(performance.now())   // timestamp of that baseline
+  const burnRef     = useRef(0)                   // burn per second across all incidents
 
   // Refresh "last updated" text every 5s
   useEffect(() => {
@@ -53,11 +55,10 @@ export default function App() {
           setStreamError(null)
           setConnected(true)
           setLastUpdate(new Date())
-          // Sync counter to authoritative server value
-          const serverTotal = data.reduce((s, i) => s + (i.revenue_lost_so_far ?? 0), 0)
-          setDisplayLost(serverTotal)
-          // Update per-second burn for rAF interpolation
-          burnRef.current = data.reduce((s, i) => s + (i.burn_per_hour ?? 0), 0) / 3600
+          // Store baseline value + timestamp — the rAF computes from here
+          baseRef.current     = data.reduce((s, i) => s + (i.revenue_lost_so_far ?? 0), 0)
+          baseTimeRef.current = performance.now()
+          burnRef.current     = data.reduce((s, i) => s + (i.burn_per_hour ?? 0), 0) / 3600
         } else if (data.error) {
           setStreamError(data.error)
         }
@@ -70,10 +71,11 @@ export default function App() {
     return () => es.close()
   }, [])
 
-  // Smooth ~60fps interpolation between server polls
+  // Compute display value every frame from baseline — no accumulation, no drift
   useEffect(() => {
     const tick = () => {
-      setDisplayLost((prev) => prev + burnRef.current / 60)
+      const elapsed = (performance.now() - baseTimeRef.current) / 1000
+      setDisplayLost(baseRef.current + burnRef.current * elapsed)
       rafRef.current = requestAnimationFrame(tick)
     }
     rafRef.current = requestAnimationFrame(tick)
