@@ -2,6 +2,7 @@ import subprocess
 import json
 import asyncio
 import re
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -34,6 +35,14 @@ QUERY_PATH = Path(__file__).parent.parent / "coral" / "revenue_query.sql"
 QUERY = _strip_sql_comments(QUERY_PATH.read_text())
 GEMINI = genai.Client()  # reads GEMINI_API_KEY or GOOGLE_API_KEY from env
 
+# ── Demo mode ─────────────────────────────────────────────────
+# Set DEMO_MODE=true to bypass Coral and serve realistic fake data.
+DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() in ("true", "1", "yes")
+
+if DEMO_MODE:
+    from demo_data import get_demo_incidents
+    print("\n⚡ DEMO MODE ACTIVE — serving fake incident data\n")
+
 SYSTEM_PROMPT = (
     "You are an incident response assistant with access to live incident data. "
     "You know exactly which customers are affected, how much revenue is at risk, "
@@ -44,7 +53,11 @@ SYSTEM_PROMPT = (
 
 
 def run_coral(query: str) -> list[dict]:
-    """Execute a Coral SQL query and return parsed JSON rows."""
+    """Execute a Coral SQL query and return parsed JSON rows.
+    In DEMO_MODE, returns pre-built fake data instead."""
+    if DEMO_MODE:
+        return get_demo_incidents()
+
     result = subprocess.run(
         ["coral", "sql", "--format", "json", query],
         capture_output=True,
@@ -73,6 +86,8 @@ async def incident_stream():
 @app.get("/health")
 async def health():
     """Quick health check — verifies Coral is reachable."""
+    if DEMO_MODE:
+        return {"status": "ok", "coral": "demo_mode", "demo": True}
     try:
         run_coral("SELECT 1")
         return {"status": "ok", "coral": "reachable"}
